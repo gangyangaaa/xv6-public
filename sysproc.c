@@ -6,6 +6,7 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "proc.h"
+#include "pstat.h" ///Yang
 
 int
 sys_fork(void)
@@ -41,7 +42,8 @@ sys_getpid(void)
 {
   return myproc()->pid;
 }
-// my change
+
+///YAng: my change
 int
 sys_getreadcount(void)
 {
@@ -94,4 +96,44 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+///Yang: implement settickets
+int
+sys_settickets(void)
+{
+  int n;
+  if (argint(0, &n) < 0) {
+    return -1;
+  }
+
+  acquire(&ptable.lock);
+  setproctickets(myproc(), n); //Yang: set ticket and update the total tickets
+  release(&ptable.lock);
+  return 0;
+}
+
+///Yang: implement getpinfo
+int
+sys_getpinfo(void) 
+{
+  ///Yang: retrieve the pointer argument
+  struct pstat *pinfo;
+  struct proc *p;
+  argptr(0, (void*)&pinfo, sizeof(*pinfo));
+  if (pinfo == 0) {
+    return -1;
+  }
+  acquire(&ptable.lock);
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    int i = p - ptable.proc;
+    if (p->state != UNUSED) {
+      pinfo->inuse[i] = p->inuse;
+      pinfo->tickets[i] = p->tickets;
+      pinfo->pid[i] = p->pid;
+      pinfo->ticks[i] = p->ticks;
+    }
+  }
+  release(&ptable.lock);
+  return 0;
 }

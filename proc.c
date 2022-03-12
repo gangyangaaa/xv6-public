@@ -5,12 +5,14 @@
 #include "mmu.h"
 #include "x86.h"
 #include "proc.h"
-#include "spinlock.h"
 
-struct {
-  struct spinlock lock;
-  struct proc proc[NPROC];
-} ptable;
+
+/// Yang
+#define PHI 0x9e3779b9
+///
+
+struct ptable_type ptable = {{0}};
+
 
 static struct proc *initproc;
 
@@ -24,6 +26,49 @@ void
 pinit(void)
 {
   initlock(&ptable.lock, "ptable");
+}
+
+
+static uint Q[4096], c = 362436;
+
+void srand(uint x)
+{
+  int i;
+
+  Q[0] = x;
+  Q[1] = x + PHI;
+  Q[2] = x + PHI + PHI;
+
+  for (i = 3; i < 4096; i++)
+    Q[i] = Q[i - 3] ^ Q[i - 2] ^ PHI ^ i;
+}
+
+uint rand(void)
+{
+  if(sizeof(unsigned long long) != 8){
+    return 0;
+  }
+  unsigned long long t, a = 18782LL;
+  static uint i = 4095;
+  uint x, r = 0xfffffffe;
+  i = (i + 1) & 4095;
+  t = a * Q[i] + c;
+  c = (t >> 32);
+  x = t + c;
+  if (x < c) {
+    x++;
+    c++;
+  }
+  return (Q[i] = r - x);
+}
+
+///Yang
+int total_tickets;
+
+void setproctickets(struct proc* pp, int n) {
+  total_tickets -= pp->tickets;
+  pp->tickets = n;
+  total_tickets += pp->tickets;
 }
 
 // Must be called with interrupts disabled
@@ -89,6 +134,7 @@ found:
   p->state = EMBRYO;
   p->pid = nextpid++;
   p->readid = 0; //my change
+  p->tickets = 1; ///Yang
 
   release(&ptable.lock);
 
@@ -201,6 +247,9 @@ fork(void)
   np->parent = curproc;
   *np->tf = *curproc->tf;
 
+  /// Yang:
+  setproctickets(np, curproc->tickets); // parent must have the same ticket number as child
+
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
@@ -261,6 +310,7 @@ exit(void)
         wakeup1(initproc);
     }
   }
+
 
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
@@ -327,15 +377,46 @@ scheduler(void)
   struct cpu *c = mycpu();
   c->proc = 0;
   
+  /// Yang:
+  acquire(&ptable.lock);
+  setproctickets(ptable.proc, 10);  // set init ticket to 10
+  release(&ptable.lock);
+  /// Yang:
+  static _Bool have_seeded = 0;
+  const int seed = 1323;
+  if(!have_seeded) {
+    srand(seed);
+    have_seeded = 1;
+  }
+
+
   for(;;){
     // Enable interrupts on this processor.
     sti();
 
+    /// Yang:
+    const int golden_ticket = rand() % (total_tickets + 1);
+    int ticket_count = 0;
+
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
+      if(p->state != RUNNABLE) {
+        #ifndef STORE_TICKETS_ON_SLEEP
+	        ticket_count += p->tickets;
+        #endif
+
         continue;
+      }
+
+      /// Yang added:
+      ticket_count += p->tickets;
+      if (ticket_count < golden_ticket) {
+        continue;
+      }
+      else if (ticket_count > total_tickets) {
+        cprintf("Extra: %d | %d | %d\n", ticket_count, total_tickets, golden_ticket); // can be deleted
+      }
 
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
@@ -344,12 +425,24 @@ scheduler(void)
       switchuvm(p);
       p->state = RUNNING;
 
-      swtch(&(c->scheduler), p->context);
+      /// Yang:
+      p->inuse = 1;
+      const int tickstart = ticks;
+
+
+      ///Yang: context switch
+      swtch(&(c->scheduler), p->context); ///Yang: move to process p
+      ///Yang: switch (p->context, &(c->scheduler));
+      ///Yang: move back to scheduler and run again from here
+      p->ticks += ticks - tickstart;
+
       switchkvm();
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
+
+      break;  // need to start looping the process allover again -- Yang
     }
     release(&ptable.lock);
 

@@ -24,6 +24,7 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 int getreadcount(void); // my change
+int settickets(int); ///Yang
 
 // ulib.c
 int stat(const char*, struct stat*);

@@ -29,4 +29,6 @@ SYSCALL(getpid)
 SYSCALL(sbrk)
 SYSCALL(sleep)
 SYSCALL(uptime)
-SYSCALL(getreadcount)
+SYSCALL(getreadcount)  ///Yang
+SYSCALL(settickets)    ///Yang
+SYSCALL(getpinfo)      ///Yang

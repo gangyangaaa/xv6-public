@@ -106,6 +106,8 @@ extern int sys_wait(void);
 extern int sys_write(void);
 extern int sys_uptime(void);
 extern int sys_getreadcount(void); //my change
+extern int sys_settickets(void);   ///Yang
+extern int sys_getpinfo(void);     ///Yang
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -130,6 +132,8 @@ static int (*syscalls[])(void) = {
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
 [SYS_getreadcount] sys_getreadcount, // my change
+[SYS_settickets] sys_settickets,    ///Yang: my change
+[SYS_getpinfo] sys_getpinfo,        ///Yang
 };
 
 void

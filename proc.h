@@ -1,3 +1,10 @@
+#ifndef _PROC_H_
+#define _PROC_H_
+
+#include "pstat.h"
+#include "spinlock.h"
+///above Yang
+
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -50,6 +57,10 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
   int readid;                  // readid_my change
+  
+  int tickets;                 ///Yang
+  int inuse;                   ///Yang: whether this slot oif the process table is in use
+  int ticks;                   ///Yang: the number of ticks each process has accumulated
 };
 
 // Process memory is laid out contiguously, low addresses first:
@@ -57,3 +68,15 @@ struct proc {
 //   original data and bss
 //   fixed-size stack
 //   expandable heap
+
+///Yang: make ptable public so that getpinfo in sysproc.c can access
+struct ptable_type {
+  struct spinlock lock;
+  struct proc proc[NPROC];
+};
+extern struct ptable_type ptable;
+
+
+void setproctickets(struct proc* pp, int n);
+
+#endif //_PROC_H_
