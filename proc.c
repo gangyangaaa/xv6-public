@@ -414,9 +414,11 @@ scheduler(void)
       if (ticket_count < golden_ticket) {
         continue;
       }
+      /*
       else if (ticket_count > total_tickets) {
         cprintf("Extra: %d | %d | %d\n", ticket_count, total_tickets, golden_ticket); // can be deleted
       }
+      */
 
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
